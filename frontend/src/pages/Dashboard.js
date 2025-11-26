@@ -1,0 +1,138 @@
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { reportsAPI } from '../services/api';
+
+const Navbar = () => {
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user'));
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
+
+  return (
+    <nav className="bg-white shadow-md">
+      <div className="container px-6 py-4 mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <Link to="/dashboard" className="text-2xl font-bold text-gray-800">
+              🌊 Flood Report
+            </Link>
+          </div>
+          <div className="flex items-center">
+            <span className="mr-4 text-gray-700">Welcome, {user?.name || 'User'}</span>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+
+function Dashboard() {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [expandedReportId, setExpandedReportId] = useState(null); // State to track the expanded report
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const response = await reportsAPI.getAll();
+        setReports(response.data);
+      } catch (err) {
+        setError('Failed to fetch reports.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
+
+  const handleDelete = async (id) => {
+    try {
+      await reportsAPI.delete(id);
+      setReports(reports.filter(report => report._id !== id));
+    } catch (err) {
+      setError('Failed to delete report.');
+    }
+  };
+
+  // Toggles the expanded report
+  const handleToggleDetails = (id) => {
+    setExpandedReportId(prevId => (prevId === id ? null : id));
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <Navbar />
+      <div className="container px-6 py-8 mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-3xl font-bold text-gray-800">Dashboard</h2>
+          <Link
+            to="/create"
+            className="px-6 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            + Create New Report
+          </Link>
+        </div>
+
+        {loading && <p>Loading reports...</p>}
+        {error && <div className="p-4 text-sm text-red-700 bg-red-100 rounded-lg">{error}</div>}
+        
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          {!loading && reports.map((report) => (
+            <div key={report._id} className="p-6 bg-white rounded-lg shadow-md">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-800">{report.title}</h3>
+                <span className={`px-2 py-1 text-xs font-semibold text-white rounded-full ${
+                  report.status === 'Pending' ? 'bg-yellow-500' :
+                  report.status === 'In Progress' ? 'bg-blue-500' : 'bg-green-500'
+                }`}>
+                  {report.status}
+                </span>
+              </div>
+              {report.image && (
+                <div className="mt-4">
+                  <img 
+                    src={`http://localhost:5000/${report.image}`} 
+                    alt={report.title} 
+                    className="w-full h-32 object-cover rounded-md mb-2" 
+                  />
+                </div>
+              )}
+              {/* Conditionally render description */}
+              {expandedReportId === report._id && (
+                <div className="mt-4">
+                    <h4 className="font-semibold text-gray-800">Description:</h4>
+                    <p className="mt-1 text-gray-600">{report.description}</p>
+                </div>
+              )}
+              <p className="mt-4 text-sm text-gray-500">
+                Reported on: {new Date(report.createdAt).toLocaleDateString()}
+              </p>
+              <div className="flex justify-end mt-4 space-x-2">
+                <button onClick={() => handleToggleDetails(report._id)} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                  {expandedReportId === report._id ? 'Hide' : 'View'}
+                </button>
+                <Link to={`/edit/${report._id}`} className="px-4 py-2 text-sm text-white bg-green-600 rounded-md hover:bg-green-700">Edit</Link>
+                <button onClick={() => handleDelete(report._id)} className="px-4 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700">Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Dashboard;
